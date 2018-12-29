@@ -6,20 +6,28 @@ import org.apache.commons.math3.stat.StatUtils;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 public class NOrderMarkovChain<S> {
 
     public final int n;
+
     private final List<List<S>> inputStates;
+    private final Map<List<S>, Integer> inputIndexes;
+
     private final List<S> outputStates;
+    private final Map<S, Integer> outputIndexes;
+
     private final RealMatrix probabilities;
 
     private NOrderMarkovChain(int n, List<List<S>> inputStates, List<S> outputStates,  RealMatrix probabilities) {
         this.n = n;
         this.inputStates = inputStates;
+        this.inputIndexes = inputStates.stream().collect(Collectors.toMap(i -> i, i -> inputStates.indexOf(i)));
         this.outputStates = outputStates;
+        this.outputIndexes = outputStates.stream().collect(Collectors.toMap(i -> i, i -> outputStates.indexOf(i)));
         this.probabilities = probabilities;
     }
 
@@ -31,10 +39,10 @@ public class NOrderMarkovChain<S> {
      * @return the next transitions
      */
     public List<Transition<S>> next(List<S> current) {
-        if (inputStates.contains(current)) {
-            double[] p = probabilities.getRow(inputStates.indexOf(current));
+        if (inputIndexes.containsKey(current)) {
+            int row = inputIndexes.get(current);
             return outputStates.stream()
-                    .map(s -> new Transition<S>(s, p[outputStates.indexOf(s)]))
+                    .map(s -> new Transition<S>(s, probabilities.getEntry(row, outputIndexes.get(s))))
                     .filter(s -> s.probability > 0)
                     .sorted((s1, s2) -> Double.compare(s2.probability, s1.probability))
                     .collect(Collectors.toList());
@@ -53,9 +61,9 @@ public class NOrderMarkovChain<S> {
      * @return the probability of the future state
      */
     public double probability(List<S> current, S future, int n) {
-        if (inputStates.contains(current) && outputStates.contains(future)) {
+        if (inputIndexes.containsKey(current) && outputIndexes.containsKey(future)) {
             RealMatrix pn = probabilities.power(n);
-            return pn.getEntry(inputStates.indexOf(current), outputStates.indexOf(future));
+            return pn.getEntry(inputIndexes.get(current), outputIndexes.get(future));
         } else {
             return 0;
         }
