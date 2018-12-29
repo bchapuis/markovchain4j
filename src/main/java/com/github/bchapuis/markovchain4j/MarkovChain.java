@@ -6,15 +6,18 @@ import org.apache.commons.math3.stat.StatUtils;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 public class MarkovChain<S> {
 
     private final List<S> states;
+    private final Map<S, Integer> indexes;
     private final RealMatrix probabilities;
 
     private MarkovChain(List<S> states, RealMatrix probabilities) {
         this.states = states;
+        this.indexes = states.stream().collect(Collectors.toMap(i -> i, i -> states.indexOf(i)));
         this.probabilities = probabilities;
     }
 
@@ -25,10 +28,10 @@ public class MarkovChain<S> {
      * @return the next transitions
      */
     public List<Transition<S>> next(S current) {
-        if (states.contains(current)) {
-            double[] p = probabilities.getRow(states.indexOf(current));
+        if (indexes.containsKey(current)) {
+            int row = indexes.get(current);
             return states.stream()
-                    .map(s -> new Transition<S>(s, p[states.indexOf(s)]))
+                    .map(s -> new Transition<>(s, probabilities.getEntry(row, indexes.get(s))))
                     .filter(s -> s.probability > 0)
                     .sorted((s1, s2) -> Double.compare(s2.probability, s1.probability))
                     .collect(Collectors.toList());
@@ -47,19 +50,19 @@ public class MarkovChain<S> {
      * @return the probability of the future state
      */
     public double probability(S current, S future, int n) {
-        if (states.contains(current) && states.contains(future)) {
+        if (indexes.containsKey(current) && indexes.containsKey(future)) {
             RealMatrix pn = probabilities.power(n);
-            return pn.getEntry(states.indexOf(current), states.indexOf(future));
+            return pn.getEntry(indexes.get(current), indexes.get(future));
         } else {
             return 0;
         }
     }
 
     /**
-     * Creates a markov chain from a list of transitions between states.
+     * Creates a markov chain from a list of transitions between indexes.
      *
-     * @param transitions the list of states
-     * @param <S> the type of states
+     * @param transitions the list of indexes
+     * @param <S> the type of indexes
      * @return the markov chain
      */
     public static <S> MarkovChain<S> create(List<S> transitions) {
